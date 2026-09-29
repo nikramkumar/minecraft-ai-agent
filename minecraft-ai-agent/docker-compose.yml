@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mcagent
+      POSTGRES_PASSWORD: mcagent
+      POSTGRES_DB: mcagent
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcagent"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Overrides .env's DATABASE_URL so the app talks to the 'postgres'
+      # service by its Docker Compose network name, not localhost.
+      DATABASE_URL: postgresql+psycopg2://mcagent:mcagent@postgres:5432/mcagent
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Mount your real Paper server directory here so the app can read
+      # server.properties and logs/latest.log. Adjust the host path.
+      - ${MINECRAFT_SERVER_DIR:-./minecraft_server}:/app/minecraft_server:ro
+
+volumes:
+  postgres_data:
